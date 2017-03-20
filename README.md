@@ -5,7 +5,7 @@ I wrote scrappit to declutter my saved-links on my reddit account, by downloadin
 
 
 ## Get an API key
-You'll need your own API to use this; [Get your own.](https://www.reddit.com/prefs/apps). You can learn about the process [here.](https://github.com/reddit/reddit/wiki/OAuth2)
+You'll need your own API ID and Key to use this; [Get your own here.](https://www.reddit.com/prefs/apps). You can learn about the process [here.](https://github.com/reddit/reddit/wiki/OAuth2)
 
 ## Set environmental variables (I use .bashrc)
 export REDDIT_USERNAME='Username'
