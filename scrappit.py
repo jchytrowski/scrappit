@@ -31,9 +31,9 @@ def unsave_post(post_id):
 
 def download_img(current_url,subreddit,nsfw,home=os.environ['HOME']):
 	try:
-		file_name=os.path.basename(current_url.split('?')[0])+'.jpg'
 		img=imgur.ff_url(current_url)
 		if img != -1:
+			file_name=os.path.basename(current_url.split('?')[0])
 			imgur.save_to(home+'/'+nsfw+'/'+subreddit, file_name, img)
 			print 'downloading %s/%s/%s' % (nsfw,subreddit,file_name)
 			return True
@@ -47,11 +47,10 @@ def download_img(current_url,subreddit,nsfw,home=os.environ['HOME']):
 def special_download_img(current_url,subreddit,nsfw,home=os.environ['HOME']):
 	#it's *special* because redditmedia and reddituploads serves jpegs
 	#with peculiar filenames; source urls need to have '&amp;' stripped.	
-
 	current_url=str(current_url.replace('amp;',''))
-	base_name=os.path.basename(current_url.split('?')[0])+'.jpg'
 	img=imgur.ff_url(current_url)
 	if img != -1:
+		base_name=os.path.basename(current_url.split('?')[0])
 		imgur.save_to(home+'/'+nsfw+'/'+subreddit, base_name, img)
 		print 'downloading %s/%s/%s' % (nsfw,subreddit,base_name)
 		return True
