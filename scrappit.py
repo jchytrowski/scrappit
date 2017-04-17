@@ -20,29 +20,30 @@ def special_characters(word):
 	else:
 		return False
 
-def unsave_post(post_id):
-	try:
-		parameters = {'id':post_id}
-		ugh = requests.post("https://oauth.reddit.com/api/unsave", headers=headers, params=parameters)
-		return 0
-	except:
-		return -1
+def unsave_post(post_id,headers=None):
+	parameters = {'id':post_id}
+	ugh = requests.post("https://oauth.reddit.com/api/unsave", headers=headers, params=parameters)
+	return 0
 
 
 def download_img(current_url,subreddit,nsfw,home=os.environ['HOME']):
-	try:
-		img=imgur.ff_url(current_url)
-		if img != -1:
-			file_name=os.path.basename(current_url.split('?')[0])
-			imgur.save_to(home+'/'+nsfw+'/'+subreddit, file_name, img)
-			print 'downloading %s/%s/%s' % (nsfw,subreddit,file_name)
-			return True
-		else:
-			return False
-	except Exception, e:
-		print e
-		print 'failed to retrieve from %s' % current_url
+	#try:
+	img=imgur.ff_url(current_url)
+	if img == -1:
 		return False
+	elif img == -2:
+		print 'error for current url, %s' % current_url
+		return False
+
+	else:
+		file_name=os.path.basename(current_url.split('?')[0])
+		imgur.save_to(home+'/'+nsfw+'/'+subreddit, file_name, img)
+		#print 'downloading %s/%s/%s' % (nsfw,subreddit,file_name)
+		return True
+	#except Exception, e:
+	#	print e
+	#	print 'failed to retrieve from %s' % current_url
+	#	return False
 
 def special_download_img(current_url,subreddit,nsfw,home=os.environ['HOME']):
 	#it's *special* because redditmedia and reddituploads serves jpegs
@@ -52,19 +53,20 @@ def special_download_img(current_url,subreddit,nsfw,home=os.environ['HOME']):
 	if img != -1:
 		base_name=os.path.basename(current_url.split('?')[0])
 		imgur.save_to(home+'/'+nsfw+'/'+subreddit, base_name, img)
-		print 'downloading %s/%s/%s' % (nsfw,subreddit,base_name)
+		#print 'downloading %s/%s/%s' % (nsfw,subreddit,base_name)
 		return True
 	else:
 		return False
 
 
-def triage(post,dl_over_18=False):
+def triage(post,dl_over_18=False,headers=None):
 	success=False
 	subreddit=post['data']['subreddit']
 	post_id=str(post['data']['name'])
 	l_url=""
 
 	if post['data']['over_18']:
+		nsfw='nsfw'
 		if dl_over_18:
 			nsfw='nsfw'
 		else:
@@ -78,7 +80,11 @@ def triage(post,dl_over_18=False):
 		l_url=post['data']['url']
 	elif 'link_url' in post['data']:
 		l_url=post['data']['link_url']
-		
+	
+	l_url=l_url.split('?')[0]	
+	if type(l_url) is int:
+		print 'fuck, %s,%s' % (post['data']['subreddit'],post['data']['name'])
+		print 'fuck'
 
 	if l_url.endswith(('jpeg','jpg','gifv','gif','png','webm','mp4')):
 		#trivial case, just download the image
@@ -98,22 +104,33 @@ def triage(post,dl_over_18=False):
 	elif 'gfycat.com' in l_url:
 		#we need a function to scrape for the url of the embedded media because gfycat has variable formats (gifv, webm, mp4, etc), and variable subdomains (zippy.gfycat.com, fat.gfycat.com, etc)
 		l_url=gfycat.scrape(l_url)	
-		success=download_img(l_url,subreddit,nsfw)
-			
+		if l_url != -1:
+			success=download_img(l_url,subreddit,nsfw)
+		else:
+			success=False
 	elif 'reddituploads' in l_url or 'redditmedia' in l_url:
 		success=special_download_img(l_url,subreddit,nsfw)	
 
 	if success:
-		unsave_post(post_id)
+		unsave_post(post_id,headers=headers)
 		time.sleep(1)
 		return 0
 	else:
 		return -1
 
 
+def enum(post):
+	if 'url' in post['data']:
+		p_url=post['data']['url']
+	elif 'link_url' in post['data']:
+		p_url=post['data']['link_url']
+	if any(c_url in p_url for c_url in ['imgur', 'reddituploads', 'gfycat']):
+		return True
+	else:
+		return False
+
+
 def main():
-	#prompt for reddit password
-	password=getpass.getpass()
 
 	#I generally set env vars in ~/.bashrc
 	api_id=os.environ['REDDIT_API_ID']
@@ -121,22 +138,32 @@ def main():
 	reddit_user=os.environ['REDDIT_USERNAME']
 	home=os.environ['HOME']
 
-	#create a session
-	client_auth = requests.auth.HTTPBasicAuth(api_id, api_pass )
-	post_data = {"grant_type": "password", "username": reddit_user, "password": password }
-	headers = {"User-Agent": "saved_comment_scrapper"}
-	response = requests.post("https://www.reddit.com/api/v1/access_token", auth=client_auth, data=post_data, headers=headers)
-	my_token=str(json.loads(response.content)['access_token'])
-	headers = {"Authorization": "bearer "+ my_token, "User-Agent": "saved_comment_scrapper"}
-	response = requests.get("https://oauth.reddit.com/user/"+reddit_user+"/saved", headers=headers)	
 
-        parser = argparse.ArgumentParser(description="Template script tool")
-        parser.add_argument('--Download', action='store_true', help='Download Saved images and gifs')
+	parser = argparse.ArgumentParser(description="Template script tool")
+	parser.add_argument('--Download', action='store_true', help='Download Saved images and gifs')
 	parser.add_argument('--Archive', action='store_true', help='Build list of saved links')
 	parser.add_argument('--Over18', action='store_true', help='Download adult content, default false')
 	parser.add_argument('--Users', help='Download user stats for ARG')
-        parser.add_argument('--Both', action='store_true', help='Archive And Download')
-        args=parser.parse_args()
+	parser.add_argument('--Both', action='store_true', help='Archive And Download')
+	parser.add_argument('--Print', action='store_true', help='Print posts, but do not download')
+	args=parser.parse_args()
+
+
+	if not ( args.Print ):
+		#dont bother with authentication unless you need to interact with reddit's servers
+		# looks like --help automatically terminates the script; args.help is actually
+		# invalid syntax, and including it will throw an exception.
+		password=getpass.getpass()
+
+	
+		#create a session
+		client_auth = requests.auth.HTTPBasicAuth(api_id, api_pass )
+		post_data = {"grant_type": "password", "username": reddit_user, "password": password }
+		headers = {"User-Agent": "saved_comment_scrapper"}
+		response = requests.post("https://www.reddit.com/api/v1/access_token", auth=client_auth, data=post_data, headers=headers)
+		my_token=str(json.loads(response.content)['access_token'])
+		headers = {"Authorization": "bearer "+ my_token, "User-Agent": "saved_comment_scrapper"}
+		response = requests.get("https://oauth.reddit.com/user/"+reddit_user+"/saved", headers=headers)	
 
 
 	if args.Both or args.Archive:
@@ -166,7 +193,7 @@ def main():
         		pickle.dump(aggregate, handle)
 
 
-	if args.Both or args.Download:
+	if args.Both or args.Download or args.Print:
 		#case --Download
 
 		pp=pprint.PrettyPrinter(indent=1)
@@ -176,23 +203,27 @@ def main():
 			book=pickle.load(file)
 
 
-		#enumerate
+		#enumerate for progess bar.
+		# pcount for total posts, dcount for posts already downloaded
 		pcount=0
 		for page in book:
-                        for post in page:
-				pcount+=1	
+			for post in page:
+				if enum(post):
+					pcount+=1
 
 		dcount=0
 		for page in book:
 			for post in page:
-				dcount+=1
-				sys.stdout.write( '%s/%s \r' % (dcount,pcount))
-                        	sys.stdout.flush()
-				current_url=''
-				current_id=str(post['data']['name'])
-				subreddit=post['data']['subreddit']
-				triage(post,args.Over18)	
-
+				if not args.Print:
+					sys.stdout.write( '%s/%s links processed.                     \r' % (dcount,pcount))
+					sys.stdout.flush()
+					current_id=str(post['data']['name'])
+					subreddit=post['data']['subreddit']
+					triage(post,args.Over18,headers=headers)
+					if enum(post):
+						dcount+=1
+				else:
+					pp.pprint(post)		
 
 if __name__ == "__main__":
 	main()
