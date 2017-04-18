@@ -25,6 +25,9 @@ def unsave_post(post_id,headers=None):
 	ugh = requests.post("https://oauth.reddit.com/api/unsave", headers=headers, params=parameters)
 	return 0
 
+def download_zip(filename,zipfile,subreddit,nsfw,home=os.environ['HOME']):
+	imgur.save_to(home+'/'+nsfw+'/'+subreddit,filename, zipfile)	
+
 
 def download_img(current_url,subreddit,nsfw,home=os.environ['HOME']):
 	#try:
@@ -84,7 +87,6 @@ def triage(post,dl_over_18=False,headers=None):
 	l_url=l_url.split('?')[0]	
 	if type(l_url) is int:
 		print 'fuck, %s,%s' % (post['data']['subreddit'],post['data']['name'])
-		print 'fuck'
 
 	if l_url.endswith(('jpeg','jpg','gifv','gif','png','webm','mp4')):
 		#trivial case, just download the image
@@ -95,6 +97,9 @@ def triage(post,dl_over_18=False,headers=None):
 		img_list=imgur.album_iterator(l_url)
 		try:
 			print 'album detected @ %s:' % l_url
+			zipname=l_url.split('/')[-1:][0]+'.album.zip'
+			remotezip=imgur.get_zip(l_url)
+			download_zip(zipname,remotezip,subreddit,nsfw)
 			for img in img_list:
 				download_img(img,subreddit,nsfw)
 			success=True
